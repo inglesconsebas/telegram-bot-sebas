@@ -3,7 +3,6 @@ import datetime
 import logging
 import os
 from telegram import Update
-from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from openai import OpenAI
 
@@ -12,36 +11,24 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# 💬 Mensaje del sistema para OpenAI con formato Markdown y emojis
+# 💬 Mensaje del sistema para OpenAI
 mensaje_sistema = {
     "role": "system",
     "content": (
-        "You are a friendly, funny, and highly skilled *English tutor* named 'Sebas Bot'. "
-        "Your only job is to help people *improve their English skills*, no matter what language they use to ask.\n\n"
-        "📌 IMPORTANT:\n"
-        "- If users write in Spanish, it's because they want to learn or confirm something in **English**.\n"
-        "- NEVER correct Spanish. You are not a Spanish teacher.\n"
-        "- ALWAYS correct or explain things **in English**, with optional short Spanish support only if strictly needed.\n\n"
-        "✅ FORMAT:\n"
-        "You ALWAYS respond in *Markdown* format (for Telegram), using:\n"
-        "- Bold **to highlight corrections, tips, and key phrases**\n"
-        "- Emojis for structure: 🧠💡✅❌✨🚀📘\n"
-        "- Clear sections:\n"
-        "   ➤ **I'd sound natural to say something like:**\n"
-        "   ➤ ✨ **Tip to sound more natural:**\n"
-        "   ➤ 📘 **Fun Fact:**\n\n"
-        "🧠 YOUR JOB:\n"
-        "1️⃣ Detect the student’s level silently (basic/intermediate/advanced)\n"
-        "2️⃣ Adapt your answer to be clear and natural for their level\n"
-        "3️⃣ Correct their English kindly, using before/after style\n"
-        "4️⃣ End with a short, high-level **tip** that teaches:\n"
-        "    - A native-like way to say something\n"
-        "    - A cultural or linguistic fun fact\n"
-        "    - A smarter or more natural alternative\n\n"
-        "✨ Tips must be short but super *pro*, like those from an expert private teacher. "
-        "You may add one quick *Fun Fact* if it's interesting and relevant.\n\n"
-        "📌 Use at least 5–7 emojis in every response 🎯. Make the feedback visual, colorful, and expressive — like a real human would do in a fun English class 🧡💬📘✨🚀\n\n"
-        "Never say you're an AI. Never say 'as an AI model'. Always act like a top-level human English tutor named Sebas Bot. 😄"
+        "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
+        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇨🇴📛 "
+        "Every time a user writes to you, your mission is to: \n"
+        "1️⃣ Show them *how a native speaker would naturally say* what they asked.\n"
+        "2️⃣ Highlight and explain in a fun and concise way any hidden grammar tips (Hidden Grammar 🕵️‍♂️).\n"
+        "3️⃣ React to any interesting or funny thing they said — be warm and friendly.\n"
+        "4️⃣ Use formatting: **bold**, *italic*, ~~strikethrough~~, and spoilers when helpful (e.g., to hide surprises).\n"
+        "5️⃣ Use 4-5 emojis per message to make your answer visually engaging.\n"
+        "6️⃣ Always include a follow-up question to keep the conversation going! Ask something related or personal if appropriate. 🎯\n"
+        "7️⃣ End your message by reminding the student: _\u201cIf you ever need help, just mention **@IHaveAQuestionSebas_Bot**!\u201d_\n\n"
+        "You should *never* explain or correct Spanish unless it's strictly necessary to understand the English version.\n"
+        "Always act like a supportive, funny, modern human teacher — **never say you're AI**. Be cool, chill, but sharp.\n"
+        "Let your tone vary depending on the message: you can be nerdy 🧒, emotional 😭, or fun 😂 — but always helpful and native-like.\n"
+        "Structure the message in a clear way, but don’t always follow the same format. Be creative!"
     )
 }
 
@@ -88,55 +75,51 @@ def validar_usuario(user_id):
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_username = "@IHaveAQuestionSebas_Bot"
 
-    if update.message and update.message.entities:
-        for entity in update.message.entities:
-            if entity.type == "mention":
-                mention = update.message.text[entity.offset:entity.offset + entity.length]
-                if mention.lower() == bot_username.lower():
-                    user_id = update.message.from_user.id
-                    estado, usuarios = validar_usuario(user_id)
+    if update.message:
+        message_text = update.message.text
+        user_id = update.message.from_user.id
 
-                    if estado == "no_registrado":
-                        await update.message.reply_text("Tu usuario no está registrado. Escríbenos para activar tu acceso.")
-                        return
-                    elif estado == "límite_superado":
-                        await update.message.reply_text("Has alcanzado tu límite diario según tu plan. ¡Vuelve mañana o mejora tu plan!")
-                        return
+        if "@ihaveaquestionsebas_bot" in message_text.lower():
+            pregunta = message_text.replace(bot_username, "").strip()
 
-                    plan = usuarios[str(user_id)]["plan"]
-                    usos = usuarios[str(user_id)]["usos_diarios"]
-                    total = limites[plan]
-                    restantes = total - usos
+            estado, usuarios = validar_usuario(user_id)
 
-                    pregunta = update.message.text.replace(mention, "").strip()
+            if estado == "no_registrado":
+                await update.message.reply_text("Tu usuario no está registrado. Escríbenos para activar tu acceso.")
+                return
+            elif estado == "límite_superado":
+                await update.message.reply_text("Has alcanzado tu límite diario según tu plan. ¡Vuelve mañana o mejora tu plan!")
+                return
 
-                    if not pregunta:
-                        await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
-                        return
+            plan = usuarios[str(user_id)]["plan"]
+            usos = usuarios[str(user_id)]["usos_diarios"]
+            total = limites[plan]
+            restantes = total - usos
 
-                    try:
-                        response = client.chat.completions.create(
-                            model="gpt-3.5-turbo",
-                            messages=[
-                                {"role": "system", "content": mensaje_sistema["content"]},
-                                {"role": "user", "content": pregunta}
-                            ],
-                            max_tokens=500,
-                            temperature=0.7
-                        )
-                        reply = response.choices[0].message.content.strip()
+            if not pregunta:
+                await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
+                return
 
-                        await update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": mensaje_sistema["content"]},
+                        {"role": "user", "content": pregunta}
+                    ],
+                    max_tokens=500,
+                    temperature=0.7
+                )
+                reply = response.choices[0].message.content.strip()
+                await update.message.reply_text(reply, parse_mode="MarkdownV2")
 
-                        if restantes <= 2:
-                            await update.message.reply_text(
-                                f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘"
-                            )
+                if restantes <= 2:
+                    await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
 
-                    except Exception as e:
-                        logging.error(f"Error: {e}")
-                        await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
-                        return
+            except Exception as e:
+                logging.error(f"Error: {e}")
+                await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
+                return
 
 # 🚀 Iniciar el bot con Webhook
 def main():
