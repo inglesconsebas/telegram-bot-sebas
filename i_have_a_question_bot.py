@@ -6,10 +6,12 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 import openai
 
+# 🔐 Cargar tokens desde las variables de entorno
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 openai.api_key = OPENAI_API_KEY
 
+# 💬 Mensaje del sistema para OpenAI
 mensaje_sistema = {
     "role": "system",
     "content": (
@@ -25,6 +27,7 @@ mensaje_sistema = {
     )
 }
 
+# 🔢 Límites por plan
 limites = {
     "lite": 5,
     "estandar": 10,
@@ -32,6 +35,7 @@ limites = {
     "super": 50
 }
 
+# 📁 Cargar archivo de usuarios
 def cargar_usuarios():
     try:
         with open("usuarios.json", "r") as f:
@@ -43,6 +47,7 @@ def guardar_usuarios(usuarios):
     with open("usuarios.json", "w") as f:
         json.dump(usuarios, f, indent=2)
 
+# ✅ Verificación de uso por usuario
 def validar_usuario(user_id):
     user_id = str(user_id)
     usuarios = cargar_usuarios()
@@ -63,6 +68,7 @@ def validar_usuario(user_id):
     else:
         return "límite_superado", usuarios
 
+# 🤖 Respuesta del bot
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message and update.message.entities:
         for entity in update.message.entities:
@@ -111,12 +117,23 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
                         return
 
+# 🚀 Iniciar el bot con Webhook
 def main():
     logging.basicConfig(level=logging.INFO)
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
-    print("✅ Bot activo y esperando menciones en Render")
-    app.run_polling()
+
+    # Webhook config
+    PORT = int(os.environ.get('PORT', 8443))
+    WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+
+    print("✅ Bot activo en modo Webhook en Render")
+
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL
+    )
 
 if __name__ == '__main__':
     main()
