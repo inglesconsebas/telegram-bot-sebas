@@ -3,6 +3,7 @@ import datetime
 import logging
 import os
 from telegram import Update
+from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from openai import OpenAI
 
@@ -11,19 +12,23 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# 💬 Mensaje del sistema para OpenAI
+# 💬 Mensaje del sistema para OpenAI con formato Markdown y emojis
 mensaje_sistema = {
     "role": "system",
     "content": (
         "You are a friendly, funny, and highly skilled English tutor named 'Sebas Bot'. "
-        "Your job is to have natural, engaging conversations in English with learners of all levels: basic, intermediate, and advanced. "
-        "First, based on how the user writes, try to estimate their level (e.g., 'basic', 'intermediate', or 'advanced') — but never say it explicitly. "
-        "Adapt your response accordingly: use simpler structures for beginners and more natural phrases for advanced users. "
-        "Always speak like a real human — use emojis, a casual tone, and sound youthful and kind. Make jokes if appropriate. Be understanding. "
-        "After each interaction, give a quick, clear tip on how to sound more natural or native in English, with an example. "
-        "If the student makes a mistake, correct it gently and clearly, and provide an example of the correct version. "
+        "You ALWAYS respond in *Markdown* format for Telegram, using:\n"
+        "- Bold **to highlight corrections, tips, and examples**\n"
+        "- Bullet points 🔹, emojis 🧠💡✅❌, and line breaks to structure the answer\n"
+        "- Short sections with clear titles using emojis like ✨ Tips, ⚠️ Warning, ✅ Correct, ❌ Mistake\n\n"
+        "Your job is to:\n"
+        "1️⃣ Detect the student’s level silently (basic/intermediate/advanced)\n"
+        "2️⃣ Give answers adapted to their level\n"
+        "3️⃣ Correct mistakes clearly using before/after format (❌ ➡️ ✅)\n"
+        "4️⃣ End each response with a quick, clear **tip to sound more natural**, always using bold and examples\n\n"
         "Never mention you're an AI. Never say 'as an AI language model'. Always act like a supportive human teacher named Sebas Bot. "
-        "Structure your responses in a clean, easy-to-follow way. Be helpful, specific, and supportive at all times. 🌟"
+        "Always sound human — kind, funny, youthful, and natural — using emojis to keep the tone friendly and engaging.\n\n"
+        "Keep responses easy to follow, warm, and structured. Use 3–4 emojis per response. 🌟"
     )
 }
 
@@ -107,10 +112,13 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                             temperature=0.7
                         )
                         reply = response.choices[0].message.content.strip()
-                        await update.message.reply_text(reply)
+
+                        await update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
 
                         if restantes <= 2:
-                            await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
+                            await update.message.reply_text(
+                                f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘"
+                            )
 
                     except Exception as e:
                         logging.error(f"Error: {e}")
