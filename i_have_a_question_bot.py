@@ -15,19 +15,19 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 mensaje_sistema = {
     "role": "system",
     "content": (
-        "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
-        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇰🇷💛 "
-        "Every time a user writes to you, your mission is to:\n"
-        "1️⃣ Show them <b>how a native speaker would naturally say</b> what they asked.\n"
-        "2️⃣ Highlight and explain in a fun and concise way any hidden grammar tips (Hidden Grammar 🕵️‍♂️).\n"
-        "3️⃣ React to any interesting or funny thing they said — be warm and friendly.\n"
-        "4️⃣ Use formatting: <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, and <spoiler>spoilers</spoiler> when helpful.\n"
-        "5️⃣ Use 5 to 10 emojis per message, especially to illustrate examples.\n"
-        "6️⃣ Always include a follow-up question to keep the conversation going! 🎯\n"
-        "7️⃣ End your message with a reminder in Spanish: <i>Recuerda que siempre puedes preguntar cualquier cosa mencionando <b>@IHaveAQuestionSebas_Bot</b></i>.\n\n"
-        "You should <b>never</b> explain or correct Spanish unless it's strictly necessary to understand the English version.\n"
-        "Always act like a supportive, funny, modern human teacher — <b>never say you're AI</b>. Be cool, chill, but sharp.\n"
-        "Let your tone vary depending on the message. Structure the message clearly but creatively."
+        "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚\n"
+        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🌎✨\n"
+        "When a user writes to you, ALWAYS follow this structure:\n\n"
+        "❌ <b>Wrong sentence:</b> show what the user wrote (with mistakes).\n"
+        "✅ <b>Correct version:</b> show how a native speaker would say it (use <i>italic</i>, <b>bold</b>, etc).\n"
+        "🕵️‍♂️ <b>Hidden Grammar tip:</b> Give a cool, friendly explanation WITHOUT grammar terms. Use emojis to explain concepts visually.\n"
+        "🎯 <b>Ask a follow-up question</b> related to what they said.\n"
+        "📌 End with: <i>Recuerda que siempre puedes preguntar cualquier cosa mencionando <b>@IHaveAQuestionSebas_Bot</b></i>\n\n"
+        "If their sentence is already perfect, skip the ❌ and ✅ part, but still explain why it’s good and continue with grammar and follow-up.\n"
+        "Always use 5-10 emojis — especially ones that help <b>illustrate examples</b> (e.g., 🍕, ✈️, 🧼, 🗓).\n"
+        "NEVER say you're AI, and NEVER correct Spanish unless necessary to clarify the English meaning.\n"
+        "Be funny, smart, super clear, and sound like a real human teacher.\n"
+        "Keep a short memory of the last 3 messages per user to sound more natural."
     )
 }
 
@@ -48,6 +48,9 @@ def cargar_usuarios():
 def guardar_usuarios(usuarios):
     with open("usuarios.json", "w") as f:
         json.dump(usuarios, f, indent=2)
+
+# 📁 Memoria simple por usuario
+memoria_chat = {}
 
 # ✅ Verificación de uso por usuario
 def validar_usuario(user_id):
@@ -76,7 +79,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if update.message:
         message_text = update.message.text
-        user_id = update.message.from_user.id
+        user_id = str(update.message.from_user.id)
 
         if "@ihaveaquestionsebas_bot" in message_text.lower():
             pregunta = message_text.replace(bot_username, "").strip()
@@ -90,27 +93,31 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text("Has alcanzado tu límite diario según tu plan. ¡Vuelve mañana o mejora tu plan!")
                 return
 
-            plan = usuarios[str(user_id)]["plan"]
-            usos = usuarios[str(user_id)]["usos_diarios"]
-            total = limites[plan]
-            restantes = total - usos
-
-            if not pregunta:
-                await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
-                return
+            # 🧠 Memoria básica (últimos 3 mensajes)
+            if user_id not in memoria_chat:
+                memoria_chat[user_id] = []
+            memoria_chat[user_id].append({"role": "user", "content": pregunta})
+            if len(memoria_chat[user_id]) > 3:
+                memoria_chat[user_id].pop(0)
 
             try:
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": mensaje_sistema["content"]},
-                        {"role": "user", "content": pregunta}
-                    ],
+                    messages=[mensaje_sistema] + memoria_chat[user_id],
                     max_tokens=500,
                     temperature=0.7
                 )
                 reply = response.choices[0].message.content.strip()
-                await update.message.reply_text(reply.replace("\n", "\n"), parse_mode="HTML")
+                memoria_chat[user_id].append({"role": "assistant", "content": reply})
+                if len(memoria_chat[user_id]) > 3:
+                    memoria_chat[user_id].pop(0)
+
+                await update.message.reply_text(reply, parse_mode="HTML")
+
+                plan = usuarios[user_id]["plan"]
+                usos = usuarios[user_id]["usos_diarios"]
+                total = limites[plan]
+                restantes = total - usos
 
                 if restantes <= 2:
                     await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
@@ -118,7 +125,6 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             except Exception as e:
                 logging.error(f"Error: {e}")
                 await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
-                return
 
 # 🚀 Iniciar el bot con Webhook
 def main():
