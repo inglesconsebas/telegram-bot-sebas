@@ -16,19 +16,17 @@ mensaje_sistema = {
     "role": "system",
     "content": (
         "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
-        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇰🇷💛 "
+        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇪🇸"
         "Every time a user writes to you, your mission is to: \n"
-        "1️⃣ Show them *how a native speaker would naturally say* what they asked.\n"
-        "2️⃣ Highlight and explain in a fun and concise way any hidden grammar tips (Hidden Grammar 🕵️‍♂️).\n"
-        "3️⃣ React to any interesting or funny thing they said — be warm and friendly.\n"
-        "4️⃣ Use formatting: <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, and <spoiler>spoilers</spoiler> when helpful.\n"
+        "1️⃣ Show them <b>how a native speaker would naturally say</b> what they asked.\n"
+        "2️⃣ Correct mistakes clearly: show what's wrong with ❌ and then what’s right with ✅.\n"
+        "3️⃣ Explain why the correction is better in a <i>simple, cool, friendly</i> way — no boring grammar rules.\n"
+        "4️⃣ Use formatting like <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, and <spoiler>spoilers</spoiler> to teach clearly.\n"
         "5️⃣ Use 4-5 emojis per message to make your answer visually engaging.\n"
-        "6️⃣ Always include a follow-up question to keep the conversation going! Ask something related or personal if appropriate. 🎯\n"
-        "7️⃣ End your message by reminding the student: <i>“If you ever need help, just mention <b>@IHaveAQuestionSebas_Bot</b>!”</i>\n\n"
-        "You should <b>never</b> explain or correct Spanish unless it's strictly necessary to understand the English version.\n"
-        "Always act like a supportive, funny, modern human teacher — <b>never say you're AI</b>. Be cool, chill, but sharp.\n"
-        "Let your tone vary depending on the message: you can be nerdy 🧒, emotional 😭, or fun 😂 — but always helpful and native-like.\n"
-        "Structure the message in a clear way, but don’t always follow the same format. Be creative!"
+        "6️⃣ End with a follow-up question to keep the conversation going.\n"
+        "7️⃣ Remind students they can mention <b>@IHaveAQuestionSebas_Bot</b> anytime they need help.\n"
+        "Be fun, chill, sharp, and positive. Never say you are an AI. Always respond like a top human teacher.\n"
+        "Use your tone flexibly: be nerdy 🤓, chill 😎, sweet 😄, emotional 😭 — adapt to the message vibe."
     )
 }
 
@@ -38,22 +36,48 @@ limites = {
     "max": 50
 }
 
-# 🧠 Memoria temporal por usuario
-contextos_usuarios = {}
+# 📁 Archivos de usuarios e historial
+USUARIOS_PATH = "usuarios.json"
+HISTORIAL_PATH = "historial_usuarios.json"
 
-# 📁 Cargar archivo de usuarios
+# 📁 Funciones de usuarios
+
 def cargar_usuarios():
     try:
-        with open("usuarios.json", "r") as f:
+        with open(USUARIOS_PATH, "r") as f:
             return json.load(f)
     except FileNotFoundError:
         return {}
 
 def guardar_usuarios(usuarios):
-    with open("usuarios.json", "w") as f:
+    with open(USUARIOS_PATH, "w") as f:
         json.dump(usuarios, f, indent=2)
 
+# 📁 Funciones de historial
+
+def cargar_historial():
+    try:
+        with open(HISTORIAL_PATH, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def guardar_historial(historial):
+    with open(HISTORIAL_PATH, "w") as f:
+        json.dump(historial, f, indent=2)
+
+def actualizar_historial(user_id, pregunta):
+    historial = cargar_historial()
+    user_id = str(user_id)
+    if user_id not in historial:
+        historial[user_id] = []
+    historial[user_id].append({"role": "user", "content": pregunta})
+    historial[user_id] = historial[user_id][-6:]  # Guardar solo las 6 últimas interacciones
+    guardar_historial(historial)
+    return historial[user_id]
+
 # ✅ Verificación de uso por usuario
+
 def validar_usuario(user_id):
     user_id = str(user_id)
     usuarios = cargar_usuarios()
@@ -80,12 +104,12 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if update.message:
         message_text = update.message.text
-        user_id = str(update.message.from_user.id)
+        user_id = update.message.from_user.id
 
         if "@ihaveaquestionsebas_bot" in message_text.lower():
             pregunta = message_text.replace(bot_username, "").strip()
-            estado, usuarios = validar_usuario(user_id)
 
+            estado, usuarios = validar_usuario(user_id)
             if estado == "no_registrado":
                 await update.message.reply_text("Tu usuario no está registrado. Escríbenos para activar tu acceso.")
                 return
@@ -93,31 +117,22 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text("Has alcanzado tu límite diario según tu plan. ¡Vuelve mañana o mejora tu plan!")
                 return
 
-            plan = usuarios[user_id]["plan"]
-            usos = usuarios[user_id]["usos_diarios"]
-            total = limites[plan]
-            restantes = total - usos
-
-            if not pregunta:
-                await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
-                return
-
-            historial = contextos_usuarios.get(user_id, [])
-            historial.append({"role": "user", "content": pregunta})
+            historial_usuario = actualizar_historial(user_id, pregunta)
 
             try:
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
-                    messages=[mensaje_sistema] + historial[-10:],  # Limitar a las últimas 10 interacciones
-                    max_tokens=500,
+                    messages=[mensaje_sistema] + historial_usuario,
+                    max_tokens=600,
                     temperature=0.7
                 )
                 reply = response.choices[0].message.content.strip()
                 await update.message.reply_text(reply, parse_mode="HTML")
 
-                historial.append({"role": "assistant", "content": reply})
-                contextos_usuarios[user_id] = historial
-
+                plan = usuarios[str(user_id)]["plan"]
+                usos = usuarios[str(user_id)]["usos_diarios"]
+                total = limites[plan]
+                restantes = total - usos
                 if restantes <= 2:
                     await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
 
@@ -135,17 +150,11 @@ def main():
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    # Webhook config
     PORT = int(os.environ.get('PORT', 8443))
     WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
     print("✅ Bot activo en modo Webhook en Render")
-
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        webhook_url=WEBHOOK_URL
-    )
+    app.run_webhook(listen="0.0.0.0", port=PORT, webhook_url=WEBHOOK_URL)
 
 if __name__ == '__main__':
     main()
