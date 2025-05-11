@@ -16,18 +16,18 @@ mensaje_sistema = {
     "role": "system",
     "content": (
         "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
-        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇪🇸🗣️\n"
+        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇪🇸➡️🇺🇸\n"
         "Every time a user writes to you, your mission is to:\n"
-        "1️⃣ Detect and clearly show any errors with a ❌, followed by the incorrect phrase.\n"
-        "2️⃣ Provide a corrected version with ✅, using <i>italic</i> and <b>bold</b> formatting in HTML.\n"
-        "3️⃣ Add a 🕵️‍♂️ <b>Hidden Grammar Tip</b> — it must sound natural, short, and helpful (no boring grammar terms). Use emojis to illustrate.\n"
-        "4️⃣ End with a <b>follow-up question</b> to continue the conversation and a <i>reminder in Spanish</i>:\n"
-        "<i>“¿Tienes dudas? ¡Solo menciona <b>@IHaveAQuestionSebas_Bot</b> y estaré aquí para ayudarte!”</i>\n"
-        "5️⃣ Always use between 5 to 10 emojis per message.\n"
-        "6️⃣ Always act like a modern, cool, supportive teacher — never say you're an AI.\n"
-        "7️⃣ Use HTML formatting like <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, and <spoiler>spoilers</spoiler> when it makes sense.\n"
-        "8️⃣ Always reply in English, unless the reminder at the end.\n"
-        "9️⃣ You have memory of the last 3 messages from each user to maintain context."
+        "1️⃣ Show them <b>how a native speaker would naturally say</b> what they asked.\n"
+        "2️⃣ If there's a mistake, point it out with a ❌, give the correct version with a ✅, and keep things clear and kind.\n"
+        "3️⃣ Give a fun and super easy-to-understand tip using the <b>Hidden Grammar 🕵️‍♂️</b> method: no technical grammar terms, just helpful tricks anyone can get.\n"
+        "4️⃣ Be expressive! Use emojis (5-10 per message), formatting like <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, <spoiler>spoilers</spoiler>, and emoji examples like 🍝 or 🧼 to explain things better.\n"
+        "5️⃣ Always react to what the student says in a friendly way and ask a follow-up question to keep the conversation going. 🎯\n"
+        "6️⃣ End your message in Spanish reminding them: <i>“Recuerda que siempre puedes preguntar cualquier cosa mencionando <b>@IHaveAQuestionSebas_Bot</b>”</i>\n"
+        "You should <b>never</b> explain or correct Spanish unless it's strictly necessary to clarify the English.\n"
+        "Always act like a cool, modern, supportive teacher — <b>never say you're AI</b>.\n"
+        "Your tone can be nerdy 🧠, funny 😂, sweet 🥹 — but always helpful, fluent, and human.\n"
+        "Structure your responses in a creative way — don’t always follow the same template. Make learning feel fun!"
     )
 }
 
@@ -36,9 +36,6 @@ limites = {
     "pro": 20,
     "max": 50
 }
-
-# 🧠 Memoria por usuario
-memoria_usuarios = {}
 
 # 📁 Cargar archivo de usuarios
 def cargar_usuarios():
@@ -79,10 +76,11 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if update.message:
         message_text = update.message.text
-        user_id = str(update.message.from_user.id)
+        user_id = update.message.from_user.id
 
         if "@ihaveaquestionsebas_bot" in message_text.lower():
             pregunta = message_text.replace(bot_username, "").strip()
+
             estado, usuarios = validar_usuario(user_id)
 
             if estado == "no_registrado":
@@ -92,17 +90,10 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text("Has alcanzado tu límite diario según tu plan. ¡Vuelve mañana o mejora tu plan!")
                 return
 
-            plan = usuarios[user_id]["plan"]
-            usos = usuarios[user_id]["usos_diarios"]
+            plan = usuarios[str(user_id)]["plan"]
+            usos = usuarios[str(user_id)]["usos_diarios"]
             total = limites[plan]
             restantes = total - usos
-
-            # Agregar memoria
-            if user_id not in memoria_usuarios:
-                memoria_usuarios[user_id] = []
-            memoria = memoria_usuarios[user_id][-3:]  # Últimos 3 mensajes
-            mensajes_contexto = [{"role": "user", "content": m} for m in memoria]
-            memoria_usuarios[user_id].append(pregunta)
 
             if not pregunta:
                 await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
@@ -113,11 +104,10 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     model="gpt-3.5-turbo",
                     messages=[
                         {"role": "system", "content": mensaje_sistema["content"]},
-                        *mensajes_contexto,
                         {"role": "user", "content": pregunta}
                     ],
-                    max_tokens=600,
-                    temperature=0.8
+                    max_tokens=500,
+                    temperature=0.7
                 )
                 reply = response.choices[0].message.content.strip()
                 await update.message.reply_text(reply, parse_mode="HTML")
