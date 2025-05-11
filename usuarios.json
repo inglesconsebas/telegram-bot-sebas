@@ -1,8 +1,12 @@
 {
   "123456789": {
-    "nombre": "Juan",
-    "plan": "lite",
+    "plan": "pro",
     "usos_diarios": 0,
-    "ultimo_uso": "2025-05-01"
+    "ultimo_uso": "2025-05-11"
+  },
+  "987654321": {
+    "plan": "max",
+    "usos_diarios": 0,
+    "ultimo_uso": "2025-05-11"
   }
 }
