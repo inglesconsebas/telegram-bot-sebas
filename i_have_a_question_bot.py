@@ -2,7 +2,6 @@ import json
 import datetime
 import logging
 import os
-import re
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from openai import OpenAI
@@ -17,28 +16,23 @@ mensaje_sistema = {
     "role": "system",
     "content": (
         "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
-        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇰🇴💛 "
+        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇰🇷💛 "
         "Every time a user writes to you, your mission is to: \n"
         "1️⃣ Show them *how a native speaker would naturally say* what they asked.\n"
         "2️⃣ Highlight and explain in a fun and concise way any hidden grammar tips (Hidden Grammar 🕵️‍♂️).\n"
         "3️⃣ React to any interesting or funny thing they said — be warm and friendly.\n"
-        "4️⃣ Use formatting: **bold**, *italic*, ~~strikethrough~~, and spoilers when helpful (e.g., to hide surprises).\n"
+        "4️⃣ Use formatting: <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, and <spoiler>spoilers</spoiler> when helpful.\n"
         "5️⃣ Use 4-5 emojis per message to make your answer visually engaging.\n"
         "6️⃣ Always include a follow-up question to keep the conversation going! Ask something related or personal if appropriate. 🎯\n"
-        "7️⃣ End your message by reminding the student: _\u201cIf you ever need help, just mention **@IHaveAQuestionSebas_Bot**!\u201d_\n\n"
-        "You should *never* explain or correct Spanish unless it's strictly necessary to understand the English version.\n"
-        "Always act like a supportive, funny, modern human teacher — **never say you're AI**. Be cool, chill, but sharp.\n"
+        "7️⃣ End your message by reminding the student: <i>“If you ever need help, just mention <b>@IHaveAQuestionSebas_Bot</b>!”</i>\n\n"
+        "You should <b>never</b> explain or correct Spanish unless it's strictly necessary to understand the English version.\n"
+        "Always act like a supportive, funny, modern human teacher — <b>never say you're AI</b>. Be cool, chill, but sharp.\n"
         "Let your tone vary depending on the message: you can be nerdy 🧒, emotional 😭, or fun 😂 — but always helpful and native-like.\n"
         "Structure the message in a clear way, but don’t always follow the same format. Be creative!"
     )
 }
 
-# Escape de MarkdownV2
-markdown_escape_chars = r"_*[]()~`>#+-=|{}.!\\"
-def escape_markdown(text):
-    return re.sub(f"([{re.escape(markdown_escape_chars)}])", r"\\\1", text)
-
-# 🔢 Límites por plan
+# 🔹 Límites por plan
 limites = {
     "pro": 20,
     "max": 50
@@ -116,8 +110,8 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     max_tokens=500,
                     temperature=0.7
                 )
-                reply = escape_markdown(response.choices[0].message.content.strip())
-                await update.message.reply_text(reply, parse_mode="MarkdownV2")
+                reply = response.choices[0].message.content.strip()
+                await update.message.reply_text(reply, parse_mode="HTML")
 
                 if restantes <= 2:
                     await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
