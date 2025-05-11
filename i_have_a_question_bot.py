@@ -2,6 +2,7 @@ import json
 import datetime
 import logging
 import os
+import re
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from openai import OpenAI
@@ -31,6 +32,11 @@ mensaje_sistema = {
         "Structure the message in a clear way, but don’t always follow the same format. Be creative!"
     )
 }
+
+# Escape de MarkdownV2
+markdown_escape_chars = r"_\*\[\]\(\)~`>#+\-=|{}.!"
+def escape_markdown(text):
+    return re.sub(f"([{re.escape(markdown_escape_chars)}])", r"\\\\\1", text)
 
 # 🔢 Límites por plan
 limites = {
@@ -110,7 +116,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     max_tokens=500,
                     temperature=0.7
                 )
-                reply = response.choices[0].message.content.strip()
+                reply = escape_markdown(response.choices[0].message.content.strip())
                 await update.message.reply_text(reply, parse_mode="MarkdownV2")
 
                 if restantes <= 2:
