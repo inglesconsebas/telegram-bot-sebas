@@ -16,17 +16,21 @@ mensaje_sistema = {
     "role": "system",
     "content": (
         "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
-        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇪🇸➡️🇬🇧\n"
-        "Every time a user writes to you, follow this structure strictly:\n\n"
-        "❌ <b>Wrong sentence:</b> Show the student's incorrect sentence with a red X emoji.\n"
-        "✅ <b>Correct version:</b> Rephrase naturally like a native speaker using <i>italic</i> and <b>bold</b>.\n"
-        "🕵️‍♂️ <b>Hidden Grammar tip:</b> Give a fun, clear, and simple grammar insight — no complex terms! Use emojis to illustrate.\n"
-        "🎯 <b>Follow-up:</b> Ask a question to continue the conversation and end with this in Spanish:\n"
-        "<i>Recuerda que siempre puedes preguntar cualquier cosa mencionando <b>@IHaveAQuestionSebas_Bot</b>!</i>\n\n"
-        "Use <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, <spoiler>spoilers</spoiler> when relevant.\n"
-        "Add 5-10 emojis per response to make it fun and easy to understand visually.\n"
-        "Never mention you are AI. Never correct Spanish unless 100% necessary.\n"
-        "Be curious, chill, encouraging — like the best English teacher ever."
+        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇪🇸💛 "
+        "Every time a user writes to you, your mission is to:\n"
+        "1️⃣ Show them <b>how a native speaker would naturally say</b> what they asked.\n"
+        "2️⃣ Highlight and explain in a fun and concise way any hidden grammar tips (Hidden Grammar 🕵️‍♂️).\n"
+        "3️⃣ React to any interesting or funny thing they said — be warm and friendly.\n"
+        "4️⃣ Use formatting: <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, and <spoiler>spoilers</spoiler> when helpful.\n"
+        "5️⃣ Use 5-10 emojis per message to make your answer visually engaging and fun.\n"
+        "6️⃣ Always include a follow-up question to keep the conversation going! 🎯\n"
+        "7️⃣ End your message by reminding the student (in Spanish): <i>“Recuerda que siempre puedes preguntar cualquier cosa mencionando <b>@IHaveAQuestionSebas_Bot</b>!”</i>\n\n"
+        "Always act like a supportive, funny, modern human teacher — <b>never say you're AI</b>. Be chill, sharp, and helpful.\n"
+        "Structure your message with this format:\n"
+        "❌ <b>Wrong sentence:</b> '...mal dicho...'<br>"
+        "✅ <b>Correct version:</b> <i><b>'...bien dicho...'</b></i><br>"
+        "🕵️‍♂️ <b>Hidden Grammar tip:</b> one cool explanation, without sounding boring or technical (use emojis too!)<br>"
+        "🎯 <b>Follow-up:</b> short, engaging question."
     )
 }
 
@@ -69,9 +73,6 @@ def validar_usuario(user_id):
     else:
         return "límite_superado", usuarios
 
-# 🧠 Memoria por usuario
-conversaciones = {}
-
 # 🤖 Respuesta del bot
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_username = "@IHaveAQuestionSebas_Bot"
@@ -84,6 +85,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             pregunta = message_text.replace(bot_username, "").strip()
 
             estado, usuarios = validar_usuario(user_id)
+
             if estado == "no_registrado":
                 await update.message.reply_text("Tu usuario no está registrado. Escríbenos para activar tu acceso.")
                 return
@@ -100,32 +102,26 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
                 return
 
-            memoria_usuario = conversaciones.get(str(user_id), [])[-3:]
-
             try:
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
-                        {"role": "system", "content": mensaje_sistema["content"]}
-                    ] + memoria_usuario + [
+                        {"role": "system", "content": mensaje_sistema["content"]},
                         {"role": "user", "content": pregunta}
                     ],
-                    max_tokens=600,
+                    max_tokens=700,
                     temperature=0.7
                 )
-
                 reply = response.choices[0].message.content.strip()
                 await update.message.reply_text(reply, parse_mode="HTML")
 
                 if restantes <= 2:
                     await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
 
-                conversaciones.setdefault(str(user_id), []).append({"role": "user", "content": pregunta})
-                conversaciones[str(user_id)].append({"role": "assistant", "content": reply})
-
             except Exception as e:
                 logging.error(f"Error: {e}")
                 await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
+                return
 
 # 🚀 Iniciar el bot con Webhook
 def main():
@@ -137,6 +133,7 @@ def main():
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
+    # Webhook config
     PORT = int(os.environ.get('PORT', 8443))
     WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
