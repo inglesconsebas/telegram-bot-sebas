@@ -29,10 +29,8 @@ mensaje_sistema = {
 
 # 🔢 Límites por plan
 limites = {
-    "lite": 5,
-    "estandar": 10,
-    "premium": 20,
-    "super": 50
+    "pro": 20,
+    "max": 50
 }
 
 # 📁 Cargar archivo de usuarios
