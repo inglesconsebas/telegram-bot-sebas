@@ -68,11 +68,13 @@ def validar_usuario(user_id):
 
 # 🤖 Respuesta del bot
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    bot_username = "@IHaveAQuestionSebas_Bot"
+
     if update.message and update.message.entities:
         for entity in update.message.entities:
             if entity.type == "mention":
                 mention = update.message.text[entity.offset:entity.offset + entity.length]
-                if mention.lower() == f"@{context.bot.username.lower()}":
+                if mention.lower() == bot_username.lower():
                     user_id = update.message.from_user.id
                     estado, usuarios = validar_usuario(user_id)
 
@@ -119,9 +121,9 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def main():
     logging.basicConfig(level=logging.INFO)
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    
-    # ✅ Mostrar el nombre real del bot en los logs
-    print(f"✅ Bot username: @{app.bot.username}")
+
+    bot_username = "@IHaveAQuestionSebas_Bot"
+    print(f"✅ Bot username: {bot_username}")
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
