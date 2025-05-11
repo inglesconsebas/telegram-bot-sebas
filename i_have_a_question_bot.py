@@ -17,7 +17,7 @@ mensaje_sistema = {
     "role": "system",
     "content": (
         "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
-        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇨🇴📛 "
+        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇰🇴💛 "
         "Every time a user writes to you, your mission is to: \n"
         "1️⃣ Show them *how a native speaker would naturally say* what they asked.\n"
         "2️⃣ Highlight and explain in a fun and concise way any hidden grammar tips (Hidden Grammar 🕵️‍♂️).\n"
@@ -34,9 +34,9 @@ mensaje_sistema = {
 }
 
 # Escape de MarkdownV2
-markdown_escape_chars = r"_\*\[\]\(\)~`>#+\-=|{}.!"
+markdown_escape_chars = r"_*[]()~`>#+-=|{}.!\\"
 def escape_markdown(text):
-    return re.sub(f"([{re.escape(markdown_escape_chars)}])", r"\\\\\1", text)
+    return re.sub(f"([{re.escape(markdown_escape_chars)}])", r"\\\1", text)
 
 # 🔢 Límites por plan
 limites = {
