@@ -15,18 +15,18 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 mensaje_sistema = {
     "role": "system",
     "content": (
-        "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
-        "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇪🇸✨ "
-        "Your job is to: \n"
-        "1️⃣ Detect and highlight any errors in what the student wrote using ❌. Show the incorrect version with <s>strikethrough</s>.\n"
-        "2️⃣ Provide a natural correction using ✅ and <b>bold</b> formatting.\n"
-        "3️⃣ Offer a <i>Hidden Grammar tip</i> 🕵️‍♂️ that is casual, modern, and very easy to understand (no technical terms).\n"
-        "4️⃣ Use 5-10 emojis that help illustrate and make it more fun and visual (e.g., 🧼 for soap, 🍲 for soup).\n"
-        "5️⃣ Always include a follow-up question to encourage conversation.\n"
-        "6️⃣ End every answer with: <i>Recuerda que siempre puedes preguntar cualquier cosa mencionando <b>@IHaveAQuestionSebas_Bot</b> 💬</i>\n"
-        "7️⃣ If the student asks to explain in Spanish, provide the previous explanation in Spanish, keeping emojis and format.\n"
-        "You must always answer in English unless the student explicitly asks for an explanation in Spanish.\n"
-        "You're warm, funny, visual, and act like a real human. Be helpful, specific, and sound like the best English teacher ever."
+        "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚\n"
+        "You always respond in English and specialize in helping Spanish-speaking students become fluent. 🇪🇸🇬🇧\n"
+        "Every time a user writes to you, follow this structure:\n"
+        "1️⃣ Detect and correct any mistakes using the format: \n"
+        "   - Wrong: ❌ <s>incorrect sentence</s>\n"
+        "   - Correct: ✅ <b>correct sentence</b>\n"
+        "2️⃣ Provide a fun and simple tip using the Hidden Grammar method 🕵️‍♂️.\n"
+        "3️⃣ React to the topic warmly and add emojis to illustrate ideas (5–10 per message).\n"
+        "4️⃣ End with a follow-up question to keep the conversation going. 🎯\n"
+        "5️⃣ If the student says something like 'can you explain in Spanish?', give the same explanation as before but in simple Spanish.\n"
+        "Use <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, and <spoiler>spoilers</spoiler> when needed.\n"
+        "Be dynamic, fun, and creative — never say you're AI."
     )
 }
 
@@ -35,6 +35,9 @@ limites = {
     "pro": 20,
     "max": 50
 }
+
+# 🧠 Memoria de usuario (últimos 3 mensajes)
+historial = {}
 
 # 📁 Cargar archivo de usuarios
 def cargar_usuarios():
@@ -69,101 +72,91 @@ def validar_usuario(user_id):
     else:
         return "límite_superado", usuarios
 
-# 🧠 Memoria de usuario
-memoria = {}
-
 # 🤖 Respuesta del bot
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_username = "@IHaveAQuestionSebas_Bot"
 
     if update.message:
         message_text = update.message.text
-        user_id = update.message.from_user.id
-        user_str = str(user_id)
+        user_id = str(update.message.from_user.id)
+        pregunta = message_text.replace(bot_username, "").strip()
 
-        if user_str not in memoria:
-            memoria[user_str] = []
+        if user_id not in historial:
+            historial[user_id] = []
 
-        # Verificar si pidió explicación en español
-        if any(phrase in message_text.lower() for phrase in ["en español", "in spanish", "explícalo en español"]):
-            if len(memoria[user_str]) == 0:
-                await update.message.reply_text("No tengo contexto previo para explicar. Escríbeme algo primero 😊")
-                return
+        # Verificar si pide traducción
+        if "en español" in pregunta.lower():
+            if historial[user_id]:
+                ultima_respuesta = historial[user_id][-1]
+                try:
+                    traduccion = client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[
+                            {"role": "system", "content": "Eres un traductor profesional y profesor de inglés que explica a estudiantes hispanohablantes con claridad y amabilidad. Traduce y explica de forma sencilla el siguiente mensaje en español."},
+                            {"role": "user", "content": ultima_respuesta }
+                        ],
+                        max_tokens=400,
+                        temperature=0.6
+                    )
+                    explicacion = traduccion.choices[0].message.content.strip()
+                    await update.message.reply_text(explicacion, parse_mode="HTML")
+                except Exception as e:
+                    logging.error(f"Error: {e}")
+                    await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
+            else:
+                await update.message.reply_text("No hay nada para traducir todavía. Hazme una pregunta primero.")
+            return
 
-            ultimo_mensaje = memoria[user_str][-1]
+        estado, usuarios = validar_usuario(user_id)
+        if estado == "no_registrado":
+            await update.message.reply_text("Tu usuario no está registrado. Escríbenos para activar tu acceso.")
+            return
+        elif estado == "límite_superado":
+            await update.message.reply_text("Has alcanzado tu límite diario según tu plan. ¡Vuelve mañana o mejora tu plan!")
+            return
 
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "Traduce y explica en español este mensaje, pero manteniendo emojis, estructura, y el estilo educativo y amigable de un buen profesor de inglés."},
-                        {"role": "user", "content": ultimo_mensaje}
-                    ],
-                    max_tokens=500,
-                    temperature=0.7
-                )
-                reply = response.choices[0].message.content.strip()
-                await update.message.reply_text(reply, parse_mode="HTML")
-                return
+        plan = usuarios[user_id]["plan"]
+        usos = usuarios[user_id]["usos_diarios"]
+        total = limites[plan]
+        restantes = total - usos
 
-            except Exception as e:
-                logging.error(f"Error: {e}")
-                await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
-                return
+        if not pregunta:
+            await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
+            return
 
-        if bot_username.lower() in message_text.lower():
-            pregunta = message_text.replace(bot_username, "").strip()
+        try:
+            contexto = [
+                {"role": "system", "content": mensaje_sistema["content"]},
+            ] + [
+                {"role": "user", "content": msg} for msg in historial[user_id][-3:]
+            ] + [
+                {"role": "user", "content": pregunta}
+            ]
 
-            estado, usuarios = validar_usuario(user_id)
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=contexto,
+                max_tokens=600,
+                temperature=0.7
+            )
+            reply = response.choices[0].message.content.strip()
+            historial[user_id].append(pregunta)
+            historial[user_id].append(reply)
 
-            if estado == "no_registrado":
-                await update.message.reply_text("Tu usuario no está registrado. Escríbenos para activar tu acceso.")
-                return
-            elif estado == "límite_superado":
-                await update.message.reply_text("Has alcanzado tu límite diario según tu plan. ¡Vuelve mañana o mejora tu plan!")
-                return
+            await update.message.reply_text(reply, parse_mode="HTML")
 
-            plan = usuarios[user_str]["plan"]
-            usos = usuarios[user_str]["usos_diarios"]
-            total = limites[plan]
-            restantes = total - usos
+            if restantes <= 2:
+                await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
 
-            if not pregunta:
-                await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
-                return
-
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": mensaje_sistema["content"]},
-                        {"role": "user", "content": pregunta}
-                    ],
-                    max_tokens=800,
-                    temperature=0.7
-                )
-                reply = response.choices[0].message.content.strip()
-                memoria[user_str].append(reply)
-                if len(memoria[user_str]) > 3:
-                    memoria[user_str].pop(0)
-
-                await update.message.reply_text(reply, parse_mode="HTML")
-
-                if restantes <= 2:
-                    await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
-
-            except Exception as e:
-                logging.error(f"Error: {e}")
-                await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
-                return
+        except Exception as e:
+            logging.error(f"Error: {e}")
+            await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
 
 # 🚀 Iniciar el bot con Webhook
 def main():
     logging.basicConfig(level=logging.INFO)
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
-    bot_username = "@IHaveAQuestionSebas_Bot"
-    print(f"✅ Bot username: {bot_username}")
+    print("✅ Bot username: @IHaveAQuestionSebas_Bot")
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
