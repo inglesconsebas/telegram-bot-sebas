@@ -4,12 +4,12 @@ import logging
 import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
-import openai
+from openai import OpenAI
 
 # 🔐 Cargar tokens desde las variables de entorno
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-openai.api_key = OPENAI_API_KEY
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 💬 Mensaje del sistema para OpenAI
 mensaje_sistema = {
@@ -97,16 +97,16 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         return
 
                     try:
-                        response = openai.ChatCompletion.create(
+                        response = client.chat.completions.create(
                             model="gpt-3.5-turbo",
                             messages=[
-                                mensaje_sistema,
+                                {"role": "system", "content": mensaje_sistema["content"]},
                                 {"role": "user", "content": pregunta}
                             ],
                             max_tokens=500,
                             temperature=0.7
                         )
-                        reply = response.choices[0].message.content
+                        reply = response.choices[0].message.content.strip()
                         await update.message.reply_text(reply)
 
                         if restantes <= 2:
