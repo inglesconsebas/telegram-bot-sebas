@@ -119,6 +119,10 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def main():
     logging.basicConfig(level=logging.INFO)
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    
+    # ✅ Mostrar el nombre real del bot en los logs
+    print(f"✅ Bot username: @{app.bot.username}")
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
     # Webhook config
