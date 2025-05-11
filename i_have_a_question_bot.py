@@ -18,7 +18,7 @@ mensaje_sistema = {
         "You are a world-class English teacher named 'Sebas Bot'. 🧑‍🏫💚 "
         "You always respond in English, and you specialize in helping Spanish-speaking students become more fluent. 🇰🇷💛 "
         "Every time a user writes to you, your mission is to: \n"
-        "1️⃣ Show them <b>how a native speaker would naturally say</b> what they asked.\n"
+        "1️⃣ Show them *how a native speaker would naturally say* what they asked.\n"
         "2️⃣ Highlight and explain in a fun and concise way any hidden grammar tips (Hidden Grammar 🕵️‍♂️).\n"
         "3️⃣ React to any interesting or funny thing they said — be warm and friendly.\n"
         "4️⃣ Use formatting: <b>bold</b>, <i>italic</i>, <s>strikethrough</s>, and <spoiler>spoilers</spoiler> when helpful.\n"
@@ -28,15 +28,7 @@ mensaje_sistema = {
         "You should <b>never</b> explain or correct Spanish unless it's strictly necessary to understand the English version.\n"
         "Always act like a supportive, funny, modern human teacher — <b>never say you're AI</b>. Be cool, chill, but sharp.\n"
         "Let your tone vary depending on the message: you can be nerdy 🧒, emotional 😭, or fun 😂 — but always helpful and native-like.\n"
-        "Structure the message in a clear way, but don’t always follow the same format. Be creative!\n\n"
-        "You also have access to a set of common Spanish-to-English errors to help students sound more native.\n"
-        "Here are some examples you can use when relevant (but adapt them to the context):\n"
-        "- ❌ 'I have 25 years' ✅ 'I'm 25 years old.'\n"
-        "- ❌ 'He has cold' ✅ 'He's cold.'\n"
-        "- ❌ 'More better' ✅ 'Much better.'\n"
-        "- ❌ 'I very like it' ✅ 'I like it a lot.'\n"
-        "- ❌ 'Do you want that I help you?' ✅ 'Do you want me to help you?'\n"
-        "If the student makes a similar mistake, correct it gently using the same format: a red cross, then a green check."
+        "Structure the message in a clear way, but don’t always follow the same format. Be creative!"
     )
 }
 
@@ -45,6 +37,9 @@ limites = {
     "pro": 20,
     "max": 50
 }
+
+# 🧠 Memoria temporal por usuario
+contextos_usuarios = {}
 
 # 📁 Cargar archivo de usuarios
 def cargar_usuarios():
@@ -79,17 +74,16 @@ def validar_usuario(user_id):
     else:
         return "límite_superado", usuarios
 
-# 🧠 Respuesta del bot
+# 🤖 Respuesta del bot
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_username = "@IHaveAQuestionSebas_Bot"
 
     if update.message:
         message_text = update.message.text
-        user_id = update.message.from_user.id
+        user_id = str(update.message.from_user.id)
 
         if "@ihaveaquestionsebas_bot" in message_text.lower():
             pregunta = message_text.replace(bot_username, "").strip()
-
             estado, usuarios = validar_usuario(user_id)
 
             if estado == "no_registrado":
@@ -99,8 +93,8 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text("Has alcanzado tu límite diario según tu plan. ¡Vuelve mañana o mejora tu plan!")
                 return
 
-            plan = usuarios[str(user_id)]["plan"]
-            usos = usuarios[str(user_id)]["usos_diarios"]
+            plan = usuarios[user_id]["plan"]
+            usos = usuarios[user_id]["usos_diarios"]
             total = limites[plan]
             restantes = total - usos
 
@@ -108,18 +102,21 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text("Hey! Just type your question or say 'Let's practice!' and I’ll help you! 😊")
                 return
 
+            historial = contextos_usuarios.get(user_id, [])
+            historial.append({"role": "user", "content": pregunta})
+
             try:
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": mensaje_sistema["content"]},
-                        {"role": "user", "content": pregunta}
-                    ],
+                    messages=[mensaje_sistema] + historial[-10:],  # Limitar a las últimas 10 interacciones
                     max_tokens=500,
                     temperature=0.7
                 )
                 reply = response.choices[0].message.content.strip()
                 await update.message.reply_text(reply, parse_mode="HTML")
+
+                historial.append({"role": "assistant", "content": reply})
+                contextos_usuarios[user_id] = historial
 
                 if restantes <= 2:
                     await update.message.reply_text(f"⚠️ Te queda{' solo' if restantes == 1 else 'n'} {restantes} interacción{'es' if restantes > 1 else ''} disponible{'s' if restantes > 1 else ''} hoy según tu plan. ¡Aprovéchala al máximo! 💪📘")
@@ -127,7 +124,6 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             except Exception as e:
                 logging.error(f"Error: {e}")
                 await update.message.reply_text("Oops! Algo salió mal. Intenta de nuevo en un momento.")
-                return
 
 # 🚀 Iniciar el bot con Webhook
 def main():
